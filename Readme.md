@@ -100,7 +100,3 @@ CC BY‑NC‑ND 4.0 – non‑commercial use only, no modifications.
 
 Fengzhi Li – lifengzhi2018@163.com
 ```
-
----
-
-你可以直接将上述内容复制到 `README.md` 文件中。如果后续添加了下游分割（MTANet）的训练脚本，只需在 **Quick Start** 中补充对应的命令即可。

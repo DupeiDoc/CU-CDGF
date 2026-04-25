@@ -1,4 +1,3 @@
-
 # CU‑CDGF: Carotid Ultrasound Conditional Diffusion Generation Framework
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -9,34 +8,61 @@
 
 CU‑CDGF is a conditional diffusion framework (ControlNet + DDPM) that generates realistic carotid artery ultrasound images from segmentation masks. It alleviates data scarcity and improves downstream segmentation, especially for the intima‑media complex (IMC).
 
+This repository provides:
+- Training code for unconditional diffusion model (DiffusionModelUNet)
+- Training code for mask‑conditioned ControlNet
+- Script to generate synthetic ultrasound images from any mask
+- Dataset loader compatible with MONAI transforms
+
 ## 2. Quick Start
 
+### Clone and install dependencies
 ```bash
-# Clone and install
 git clone https://github.com/your_username/CU-CDGF.git
 cd CU-CDGF
 pip install -r requirements.txt
 ```
 
-**Generate from a mask**  
-```python
-from diffusion.sample import generate_from_mask
-import numpy as np
-from PIL import Image
+### Dataset preparation
+Prepare an Excel file (`.xlsx`) with at least two sheets: `train` and `val`. Each sheet must contain a column `img` with full paths to original ultrasound images (PNG format). The corresponding binary masks must be stored at `<image_path_without_ext>-ALLMASK.png`.  
+Example:  
+`/data/patient1.png` → mask at `/data/patient1-ALLMASK.png`
 
-mask = np.array(Image.open("mask.png").convert("L"))
-synthetic = generate_from_mask(mask, model_path="checkpoints/controlnet_carotid.pth")
-Image.fromarray(synthetic).save("output.png")
-```
-
-**Train models**  
+### Train unconditional diffusion model
 ```bash
-# Base diffusion
-python scripts/train_diffusion.py --config config/diffusion_base.yaml
-# ControlNet
-python scripts/train_controlnet.py --config config/controlnet.yaml
-# Segmentation (MTANet)
-python scripts/train_segmentation.py --real_data /path/to/real --synthetic_data /path/to/synthetic
+python scripts/train_unconditional.py
+```
+The script will save checkpoints as `unconditional_checkpoint_epoch_*.pth`.
+
+### Train ControlNet (requires pretrained unconditional model)
+```bash
+# Modify the checkpoint path inside train_controlnet.py if needed
+python scripts/train_controlnet.py
+```
+Checkpoints are saved as `controlnet_checkpoint_epoch_*.pth`.
+
+### Generate synthetic images from a mask
+**Option 1: Using the provided generation script**  
+```bash
+python scripts/generate.py --mask path/to/mask.png --output output.png
+```
+(You may need to adapt the script to accept command‑line arguments.)
+
+**Option 2: Python code**  
+```python
+import torch
+from scripts.generate import load_trained_models, generate_from_mask
+from PIL import Image
+import numpy as np
+
+device = torch.device("cuda")
+model, controlnet, scheduler = load_trained_models("controlnet_checkpoint_epoch_149.pth", device)
+
+mask = Image.open("mask.png").convert("L").resize((128, 128))
+mask_tensor = torch.from_numpy(np.array(mask, dtype=np.float32) / 255.0)[None, None, ...]
+
+synthetic = generate_from_mask(mask_tensor, model, controlnet, scheduler, device)
+Image.fromarray((synthetic[0,0].cpu().numpy() * 255).astype(np.uint8)).save("synthetic.png")
 ```
 
 ## 3. Key Results
@@ -75,4 +101,6 @@ CC BY‑NC‑ND 4.0 – non‑commercial use only, no modifications.
 Fengzhi Li – lifengzhi2018@163.com
 ```
 
-请直接将上述内容复制到一个新文件中，命名为 `README.md` 即可。如果需要修改任何占位符（如 `your_username`、论文发表信息等），请自行调整。
+---
+
+你可以直接将上述内容复制到 `README.md` 文件中。如果后续添加了下游分割（MTANet）的训练脚本，只需在 **Quick Start** 中补充对应的命令即可。
